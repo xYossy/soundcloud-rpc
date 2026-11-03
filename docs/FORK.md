@@ -4,11 +4,11 @@ Fork of [richardhbtz/soundcloud-rpc](https://github.com/richardhbtz/soundcloud-r
 
 ## What differs from upstream
 
-- **Reliable like state** (`src/services/audioMonitorService.ts`): the like button's `class` is
-  watched with a `MutationObserver` instead of a single 50 ms read. Works while paused, catches
-  slow API responses and reverts. Click fallbacks at 300 ms and 1000 ms.
-- **Selector fallbacks**: `.playbackSoundBadge__like` → `.playbackSoundBadge .sc-button-like` → `.sc-button-like`
-  in both the monitor script and the Windows thumbar.
+- **Reliable like state** (`src/services/audioMonitorService.ts`): the like button's `class` is watched with a
+  `MutationObserver` instead of a single 50 ms read. Works while paused, catches slow API responses and reverts. Click
+  fallbacks at 300 ms and 1000 ms.
+- **Selector fallbacks**: `.playbackSoundBadge__like` → `.playbackSoundBadge .sc-button-like` → `.sc-button-like` in
+  both the monitor script and the Windows thumbar.
 - **Thumbar errors are logged** instead of swallowed; the click reports whether the button was found.
 - **Thumbar play/pause tooltip** updates `buttons[2]` (was `buttons[1]`, i.e. the previous button).
 - `workflow_dispatch` trigger so releases can be started from a tag in a fork.
@@ -28,8 +28,8 @@ BrowserView (soundcloud.com)
                                                          └ thumbarService (Windows taskbar)
 ```
 
-The renderer has no Node access; every state flows through that single IPC channel and is
-validated in `src/validation.ts` (`isTrustedSoundCloudSender` restricts it to `*.soundcloud.com`).
+The renderer has no Node access; every state flows through that single IPC channel and is validated in
+`src/validation.ts` (`isTrustedSoundCloudSender` restricts it to `*.soundcloud.com`).
 
 ## Build and release
 
@@ -46,15 +46,14 @@ git tag -fa vX.Y.Z -m "..." && git push -f origin vX.Y.Z
 gh workflow run main.yml --repo xYossy/soundcloud-rpc --ref vX.Y.Z
 ```
 
-`--ref <tag>` matters: the release step only runs when `github.ref` is `refs/tags/v*`.
-Push events did not trigger workflows in this fork; `workflow_dispatch` does.
+`--ref <tag>` matters: the release step only runs when `github.ref` is `refs/tags/v*`. Push events did not trigger
+workflows in this fork; `workflow_dispatch` does.
 
 ## Widevine / VMP signing
 
-The app uses `castlabs/electron-releases` (ECS) because SoundCloud serves Widevine DRM.
-Production license servers expect a VMP-signed package. Forks have no EVS credentials, so
-builds are unsigned (`STRICT_VMP_SIGNING=false` in the workflow) and DRM-protected tracks may
-refuse to play.
+The app uses `castlabs/electron-releases` (ECS) because SoundCloud serves Widevine DRM. Production license servers
+expect a VMP-signed package. Forks have no EVS credentials, so builds are unsigned (`STRICT_VMP_SIGNING=false` in the
+workflow) and DRM-protected tracks may refuse to play.
 
 To sign:
 
