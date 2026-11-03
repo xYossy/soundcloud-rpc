@@ -12,7 +12,7 @@ import {
     type Session,
 } from 'electron';
 import { ElectronBlocker, fullLists } from '@ghostery/adblocker-electron';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'fs';
+import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync, copyFileSync } from 'fs';
 import fetch from 'cross-fetch';
 import { setupDarwinMenu } from './macos/menu';
 import { NotificationManager } from './notifications/notificationManager';
@@ -98,45 +98,31 @@ let isQuitting = false;
 let memoryPressureHandlerRegistered = false;
 const devMode = process.argv.includes('--dev');
 const isMac = process.platform === 'darwin';
-// Claim the Chromium version we actually run. A stale "Chrome/120" next to a
-// Chromium 146 engine is a bot signal for DataDome, which guards api-v2.
-const globalChromeMajor = process.versions.chrome.split('.')[0];
-const globalUserAgent = isMac
-    ? `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${globalChromeMajor}.0.0.0 Safari/537.36`
-    : `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${globalChromeMajor}.0.0.0 Safari/537.36`;
-const globalPlatformHint = isMac ? '"macOS"' : '"Windows"';
 
-// Spoof UA headers on document navigations only. Rewriting Sec-Fetch-* on
-// XHR/fetch makes every API call look like a top-level navigation, which bot
-// protection answers with a 403 captcha (likes, follows, uploads).
-function applyNavigationHeaderSpoof(session: Session): void {
-    session.webRequest.onBeforeSendHeaders((details, callback) => {
-        const isNavigation = details.resourceType === 'mainFrame' || details.resourceType === 'subFrame';
-        if (
-            !isNavigation ||
-            details.url.includes('google') ||
-            details.url.includes('icloud') ||
-            details.url.includes('apple') ||
-            details.url.includes('cobalt')
-        ) {
-            callback({ requestHeaders: details.requestHeaders });
-            return;
+// Authenticated writes (like, follow) fail when the request metadata does not
+// match the engine. Upstream issue #125 / PR #132: every interceptor and UA
+// override makes SoundCloud's device verification reject the write, while
+// playback still works. Let Chromium build its own identity.
+
+// Diagnose like failures: log the status of every track_likes request so a
+// reverted like leaves a trace in the app's userData folder.
+function logLikeRequests(session: Session): void {
+    const logFile = path.join(app.getPath('userData'), 'like-debug.log');
+    const write = (line: string) => {
+        try {
+            appendFileSync(logFile, `${new Date().toISOString()} ${line}\n`);
+        } catch {
+            /* diagnostics must never break playback */
         }
-
-        callback({
-            requestHeaders: {
-                ...details.requestHeaders,
-                'Accept-Language': 'en-US,en;q=0.9',
-                'User-Agent': globalUserAgent,
-                'sec-ch-ua': `"Not_A Brand";v="8", "Chromium";v="${globalChromeMajor}", "Google Chrome";v="${globalChromeMajor}"`,
-                'sec-ch-ua-mobile': '?0',
-                'sec-ch-ua-platform': globalPlatformHint,
-            },
-        });
+    };
+    const filter = { urls: ['*://api-v2.soundcloud.com/users/*/track_likes/*'] };
+    session.webRequest.onCompleted(filter, (details) => {
+        write(`${details.method} ${details.statusCode} ${details.url}`);
+    });
+    session.webRequest.onErrorOccurred(filter, (details) => {
+        write(`${details.method} ERROR ${details.error} ${details.url}`);
     });
 }
-
-app.userAgentFallback = globalUserAgent;
 
 function applyMacMemoryOptimizations(): void {
     if (!isMac) return;
@@ -374,11 +360,6 @@ function createBrowserWindow(windowState: any): BrowserWindow {
         },
         backgroundColor: isDarkTheme ? '#121212' : '#ffffff',
     });
-
-    window.webContents.setUserAgent(globalUserAgent);
-
-    const session = window.webContents.session;
-    applyNavigationHeaderSpoof(session);
 
     return window;
 }
@@ -638,8 +619,6 @@ async function init() {
     });
     contentView.setAutoResize({ width: true, height: true });
 
-    contentView.webContents.setUserAgent(globalUserAgent);
-
     // Initialize services
     translationService = new TranslationService();
     themeService = new ThemeService(store);
@@ -729,9 +708,8 @@ async function init() {
         return lastTrackInfo;
     });
 
-    // Configure session
-    const session = contentView.webContents.session;
-    applyNavigationHeaderSpoof(session);
+    // Configure session: no header interception, Chromium owns the request identity.
+    logLikeRequests(contentView.webContents.session);
 
     // Apply initial settings
     await proxyService.apply();

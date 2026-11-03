@@ -45,6 +45,32 @@ Before/after, captured from the running app with a local header sink:
 When DataDome challenges, the only way through is solving its captcha in the same profile that makes the request (the
 app's own session, not an external browser).
 
+## Why likes still reverted after 0.2.2 (measured 2026-11-04)
+
+0.2.2 stopped the navigation headers on XHR, but still overrode the UA (`app.userAgentFallback`, `setUserAgent`) and
+spoofed `sec-ch-ua` on navigations. Symptom in the app: liking from the player bar shows the track in /you/likes for
+about half a second, then it disappears. Unliking works. Liking on the track page goes through but only shows after a
+reload.
+
+That asymmetry (writes rejected, deletes fine, playback fine) is SoundCloud's device verification, not DataDome.
+Upstream issue #125 and open PR #132 name the cause: every header interceptor and UA override makes the wrapper's
+request metadata contradict the engine, and authenticated writes get rejected.
+
+0.2.3 removes all of it:
+
+- both `session.webRequest.onBeforeSendHeaders` interceptors
+- `app.userAgentFallback` and every `setUserAgent` call
+- manual `sec-ch-ua*`, `Accept`, `Sec-Fetch-*`
+
+Chromium now builds its own identity. Verified on the Linux build: the page still renders with the native Electron UA
+(`... soundcloud-rpc/0.2.3 Chrome/146.0.7680.166 Electron/41.1.1 Safari/537.36`) and the player bar is present.
+
+A regression test (`src/browserNetworkingPolicy.test.ts`) fails if any interceptor, UA override or manual client hint
+comes back.
+
+Diagnostics: `logLikeRequests()` writes every `track_likes` request with method, status and error into
+`<userData>/like-debug.log`, so the next failure has a status code instead of a guess.
+
 ## Architecture in one screen
 
 ```
