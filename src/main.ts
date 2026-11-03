@@ -9,6 +9,7 @@ import {
     shell,
     components,
     type IpcMainEvent,
+    type Session,
 } from 'electron';
 import { ElectronBlocker, fullLists } from '@ghostery/adblocker-electron';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'fs';
@@ -97,10 +98,43 @@ let isQuitting = false;
 let memoryPressureHandlerRegistered = false;
 const devMode = process.argv.includes('--dev');
 const isMac = process.platform === 'darwin';
+// Claim the Chromium version we actually run. A stale "Chrome/120" next to a
+// Chromium 146 engine is a bot signal for DataDome, which guards api-v2.
+const globalChromeMajor = process.versions.chrome.split('.')[0];
 const globalUserAgent = isMac
-    ? 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+    ? `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${globalChromeMajor}.0.0.0 Safari/537.36`
+    : `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${globalChromeMajor}.0.0.0 Safari/537.36`;
 const globalPlatformHint = isMac ? '"macOS"' : '"Windows"';
+
+// Spoof UA headers on document navigations only. Rewriting Sec-Fetch-* on
+// XHR/fetch makes every API call look like a top-level navigation, which bot
+// protection answers with a 403 captcha (likes, follows, uploads).
+function applyNavigationHeaderSpoof(session: Session): void {
+    session.webRequest.onBeforeSendHeaders((details, callback) => {
+        const isNavigation = details.resourceType === 'mainFrame' || details.resourceType === 'subFrame';
+        if (
+            !isNavigation ||
+            details.url.includes('google') ||
+            details.url.includes('icloud') ||
+            details.url.includes('apple') ||
+            details.url.includes('cobalt')
+        ) {
+            callback({ requestHeaders: details.requestHeaders });
+            return;
+        }
+
+        callback({
+            requestHeaders: {
+                ...details.requestHeaders,
+                'Accept-Language': 'en-US,en;q=0.9',
+                'User-Agent': globalUserAgent,
+                'sec-ch-ua': `"Not_A Brand";v="8", "Chromium";v="${globalChromeMajor}", "Google Chrome";v="${globalChromeMajor}"`,
+                'sec-ch-ua-mobile': '?0',
+                'sec-ch-ua-platform': globalPlatformHint,
+            },
+        });
+    });
+}
 
 app.userAgentFallback = globalUserAgent;
 
@@ -344,34 +378,7 @@ function createBrowserWindow(windowState: any): BrowserWindow {
     window.webContents.setUserAgent(globalUserAgent);
 
     const session = window.webContents.session;
-    session.webRequest.onBeforeSendHeaders((details, callback) => {
-        // bypass header tampering for google &&& apple &&& cobalt endpoints
-        if (
-            details.url.includes('google') ||
-            details.url.includes('icloud') ||
-            details.url.includes('apple') ||
-            details.url.includes('cobalt')
-        ) {
-            callback({ requestHeaders: details.requestHeaders });
-            return;
-        }
-
-        const headers = {
-            ...details.requestHeaders,
-            'Accept-Language': 'en-US,en;q=0.9',
-            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-            'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-            'sec-ch-ua-mobile': '?0',
-            'sec-ch-ua-platform': globalPlatformHint, // dynamically set platform hint based on OS
-            'Upgrade-Insecure-Requests': '1',
-            'User-Agent': globalUserAgent, // ensure all requests use same user agent
-            'Sec-Fetch-Site': 'none',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-User': '?1',
-            'Sec-Fetch-Dest': 'document',
-        };
-        callback({ requestHeaders: headers });
-    });
+    applyNavigationHeaderSpoof(session);
 
     return window;
 }
@@ -724,33 +731,7 @@ async function init() {
 
     // Configure session
     const session = contentView.webContents.session;
-    session.webRequest.onBeforeSendHeaders((details, callback) => {
-        // bypass header tampering for google &&& apple &&& cobalt endpoints
-        if (
-            details.url.includes('google') ||
-            details.url.includes('icloud') ||
-            details.url.includes('apple') ||
-            details.url.includes('cobalt')
-        ) {
-            callback({ requestHeaders: details.requestHeaders });
-            return;
-        }
-        const headers = {
-            ...details.requestHeaders,
-            'Accept-Language': 'en-US,en;q=0.9',
-            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-            'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-            'sec-ch-ua-mobile': '?0',
-            'sec-ch-ua-platform': globalPlatformHint, // dynamically set platform hint based on OS
-            'Upgrade-Insecure-Requests': '1',
-            'User-Agent': globalUserAgent, // ensure all requests use the same user agent
-            'Sec-Fetch-Site': 'none',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-User': '?1',
-            'Sec-Fetch-Dest': 'document',
-        };
-        callback({ requestHeaders: headers });
-    });
+    applyNavigationHeaderSpoof(session);
 
     // Apply initial settings
     await proxyService.apply();
