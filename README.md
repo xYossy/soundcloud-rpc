@@ -16,11 +16,9 @@ Works on **Linux** (AppImage/deb), **Windows** and **macOS**
 >
 > ### Login and likes — 2027 update
 >
-> This build fixes **login** and **likes**: the client no longer rewrites request headers, and when SoundCloud answers a
-> like with a captcha, the app opens it in its own window on the same session. Solve it once and likes stick.
+> Login, likes and following work. The captcha for likes and following opens in a new tab.
 >
-> **Disable any ad blocker before logging in and before liking or following.** SoundCloud's bot protection rejects those
-> actions when an extension interferes. AdBlock stays available for normal listening.
+> **Disable ad blockers or similar extensions before logging in and before liking or following.**
 
 ## ⚡️ Quick start
 
