@@ -12,10 +12,22 @@ Works on **Linux** (AppImage/deb), **Windows** and **macOS**
 
 </div>
 
+> [!IMPORTANT]
+>
+> ### Login and likes — 2027 update
+>
+> This build fixes **login** and **likes**: the client no longer rewrites request headers, and when
+> SoundCloud answers a like with a captcha, the app opens it in its own window on the same session.
+> Solve it once and likes stick.
+>
+> **Disable any ad blocker before logging in and before liking or following.** SoundCloud's bot
+> protection rejects those actions when an extension interferes. AdBlock stays available for normal
+> listening.
+
 ## ⚡️ Quick start
 
 For the latest version of soundcloud-rpc, download the installer or executable file from the
-[latest release](https://github.com/richardhbtz/soundcloud-rpc/releases) page.
+[latest release](https://github.com/xYossy/soundcloud-rpc/releases) page.
 
 > [!NOTE]
 >
