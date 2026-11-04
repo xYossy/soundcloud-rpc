@@ -16,9 +16,9 @@ Works on **Linux** (AppImage/deb), **Windows** and **macOS**
 >
 > ### Login and likes — 2027 update
 >
-> Login, likes and following work. The captcha for likes and following opens in its own window.
+> Login, likes and following work again. A captcha opens in its own window.
 >
-> **Disable ad blockers or similar extensions before logging in and before liking or following.**
+> Ad blockers must be disabled for these actions.
 
 ## ⚡️ Quick start
 
