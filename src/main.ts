@@ -124,6 +124,32 @@ function logLikeRequests(session: Session): void {
     });
 }
 
+// DataDome challenges the like endpoint with 403 + captcha. Solving it in a
+// window that shares the app session sets the cookie that unblocks the like.
+let captchaWindow: BrowserWindow | null = null;
+
+function openCaptchaWindow(url: string): void {
+    if (captchaWindow && !captchaWindow.isDestroyed()) {
+        captchaWindow.focus();
+        return;
+    }
+    captchaWindow = new BrowserWindow({
+        width: 480,
+        height: 640,
+        autoHideMenuBar: true,
+        title: 'SoundCloud verification',
+        webPreferences: {
+            session: contentView.webContents.session,
+            contextIsolation: true,
+            nodeIntegration: false,
+        },
+    });
+    captchaWindow.loadURL(url);
+    captchaWindow.on('closed', () => {
+        captchaWindow = null;
+    });
+}
+
 function applyMacMemoryOptimizations(): void {
     if (!isMac) return;
 
@@ -1472,6 +1498,12 @@ function setupTranslationHandlers() {
 
 // setup audio event handler for track updates
 function setupAudioHandler() {
+    ipcMain.on('soundcloud:captcha', (event, url: unknown) => {
+        if (!isTrustedSoundCloudSender(event)) return;
+        if (typeof url !== 'string' || !url.startsWith('https://geo.captcha-delivery.com/')) return;
+        openCaptchaWindow(url);
+    });
+
     ipcMain.on('soundcloud:track-update', async (event, payload: unknown) => {
         if (!isTrustedSoundCloudSender(event)) {
             console.warn('Rejected track update from untrusted sender');

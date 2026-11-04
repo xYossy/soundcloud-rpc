@@ -71,6 +71,25 @@ comes back.
 Diagnostics: `logLikeRequests()` writes every `track_likes` request with method, status and error into
 `<userData>/like-debug.log`, so the next failure has a status code instead of a guess.
 
+## Why the like is 403 and the unlike is 200 (measured 2026-11-04)
+
+Reproduced in a normal logged-in Chrome on the same machine, two seconds apart:
+
+```
+DELETE .../track_likes/1865238375  -> 200  "OK"
+PUT    .../track_likes/1865238375  -> 403  {"url":"https://geo.captcha-delivery.com/captcha/?..."}
+```
+
+Same session, same IP, same page. So DataDome challenges the **like action** and lets the **unlike** through. Nothing in
+the app causes it, and it is not a like limit.
+
+0.2.4 handles it: the injected monitor script wraps XHR and `fetch`, and when a `track_likes` request answers 403 with a
+captcha URL, it hands that URL to the main process over the `soundcloud:captcha` bridge. The main process opens a
+480x640 window that shares the app's session, so solving the challenge sets the `datadome` cookie for the app itself.
+The next like goes through.
+
+Diagnostics stay: `<userData>/like-debug.log` keeps the status per request.
+
 ## Architecture in one screen
 
 ```

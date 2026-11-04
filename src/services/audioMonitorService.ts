@@ -348,6 +348,61 @@ export const audioMonitorScript = `
     });
   }
   
+  // DataDome answers a like with 403 + a captcha URL. Hand that URL to the main
+  // process so the user can solve it in the app's own session; the cookie it
+  // sets is what unblocks the next like.
+  function watchLikeCaptcha() {
+    if (window.__likeCaptchaWatch) return;
+    window.__likeCaptchaWatch = true;
+
+    function send(url) {
+      try {
+        window.soundcloudAPI.captchaRequired(url);
+      } catch (e) {
+        console.warn('captcha bridge missing', e);
+      }
+    }
+
+    function extract(text) {
+      try {
+        const body = JSON.parse(text);
+        if (body && typeof body.url === 'string' && body.url.indexOf('captcha-delivery.com') !== -1) return body.url;
+      } catch (e) {
+        /* not JSON, not a captcha */
+      }
+      return null;
+    }
+
+    const originalSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.send = function (...args) {
+      this.addEventListener('loadend', function () {
+        if (this.status !== 403 || String(this.responseURL).indexOf('/track_likes/') === -1) return;
+        const url = extract(this.responseText);
+        if (url) send(url);
+      });
+      return originalSend.apply(this, args);
+    };
+
+    const originalFetch = window.fetch;
+    window.fetch = function (...args) {
+      return originalFetch.apply(this, args).then((res) => {
+        if (res.status === 403) {
+          const target = String((args[0] && args[0].url) || args[0]);
+          if (target.indexOf('/track_likes/') !== -1) {
+            res.clone()
+              .text()
+              .then((text) => {
+                const url = extract(text);
+                if (url) send(url);
+              })
+              .catch(() => {});
+          }
+        }
+        return res;
+      });
+    };
+  }
+
   // Cleanup on page unload
   window.addEventListener('beforeunload', () => {
     if (elapsedObserver) {
@@ -357,6 +412,7 @@ export const audioMonitorScript = `
   });
   
   // Start monitoring
+  watchLikeCaptcha();
   if (document.readyState === 'complete' || document.readyState === 'interactive') {
     initialize();
   } else {
