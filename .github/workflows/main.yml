@@ -8,6 +8,30 @@ permissions:
     contents: write
 
 jobs:
+    # separate job so a formatting nit can't cancel all three release builds
+    lint:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check out Git repository
+              uses: actions/checkout@v4
+
+            - name: Install pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 10
+
+            - name: Install Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: 'pnpm'
+
+            - name: Install dependencies
+              run: pnpm install
+
+            - name: Check code formatting with Prettier
+              run: pnpm prettier --check .
+
     release:
         runs-on: ${{ matrix.os }}
         env:
@@ -53,9 +77,6 @@ jobs:
 
             - name: Run tests
               run: pnpm test
-
-            - name: Check code formatting with Prettier
-              run: pnpm prettier --check .
 
             - name: Build/release Electron app
               uses: actions-marketplace-validations/njzydark_action-electron-builder-pnpm@pnpm
