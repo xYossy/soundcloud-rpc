@@ -18,7 +18,25 @@ Works on **Linux** (AppImage/deb), **Windows** and **macOS**
 >
 > Login, likes and following work again. A captcha opens in its own window.
 >
-> Ad blockers must be disabled for these actions.
+> DNS blockers must allow the hosts listed below.
+
+## 🌐 Likes disappear or the captcha stays blank?
+
+SoundCloud protects likes, follows and login with DataDome. A blocking DNS (NextDNS, Pi-hole, AdGuard DNS) stops the
+captcha from loading, and the app gets 403. Allowlist these hosts:
+
+```
+dwt.soundcloud.com
+datadome.co
+geo.captcha-delivery.com
+ct.captcha-delivery.com
+```
+
+`datadome.co` covers `js.`, `api-js.`, `api.` and `dd.datadome.co`.
+NextDNS: Settings → Allowlist · Pi-hole: Domains → Allowlist · AdGuard Home: Filters → Custom rules.
+
+After saving, quit and restart the app, then like a track once.
+Without a DNS blocker nothing needs to be added.
 
 ## ⚡️ Quick start
 
