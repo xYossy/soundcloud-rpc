@@ -32,11 +32,10 @@ geo.captcha-delivery.com
 ct.captcha-delivery.com
 ```
 
-`datadome.co` covers `js.`, `api-js.`, `api.` and `dd.datadome.co`.
-NextDNS: Settings → Allowlist · Pi-hole: Domains → Allowlist · AdGuard Home: Filters → Custom rules.
+`datadome.co` covers `js.`, `api-js.`, `api.` and `dd.datadome.co`. NextDNS: Settings → Allowlist · Pi-hole: Domains →
+Allowlist · AdGuard Home: Filters → Custom rules.
 
-After saving, quit and restart the app, then like a track once.
-Without a DNS blocker nothing needs to be added.
+After saving, quit and restart the app, then like a track once. Without a DNS blocker nothing needs to be added.
 
 ## ⚡️ Quick start
 
